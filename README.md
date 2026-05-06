@@ -1,9 +1,9 @@
 # Smart Delivery Dispatch System
 
 ## Team Information
-- **Team Name**: [Team Name]
-- **Year**: [Year]
-- **All-Female Team**: [Yes/No]
+- **Team Name**: Mad CUbe
+- **Year**: 2nd year
+- **All-Female Team**: NO
 
 ## Architecture Overview
 
