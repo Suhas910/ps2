@@ -44,4 +44,10 @@ class GraphEngine:
                 self.dist_map[(node_i, node_j)] = adj[i][j]
 
     def get_dist(self, start_pos, end_pos):
-        return self.dist_map.get((start_pos, end_pos), np.inf)
+        dist = self.dist_map.get((start_pos, end_pos), None)
+        if dist is None or dist == np.inf:
+            # Fallback: Manhattan distance with 5 minutes per unit
+            dx = abs(start_pos[0] - end_pos[0])
+            dy = abs(start_pos[1] - end_pos[1])
+            return (dx + dy) * 5.0
+        return dist

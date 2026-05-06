@@ -1,0 +1,6 @@
+{
+    "total_orders": 150,
+    "avg_delivery_time_mins": 14.0,
+    "sla_compliance_rate": 100.0,
+    "workload_variance": 0.48
+}

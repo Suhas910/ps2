@@ -11,10 +11,7 @@ class Order:
     priority: str
     sla_minutes: int
     status: str = "PENDING"  # PENDING, ASSIGNED, IN_TRANSIT, DELIVERED
-    
-    # Using slots for memory/speed optimization
-    __slots__ = ['order_id', 'timestamp', 'location', 'prep_time', 'priority', 
-                 'sla_minutes', 'status']
+    delivery_time: datetime = None
 
 @dataclass
 class Agent:
@@ -24,6 +21,3 @@ class Agent:
     active_orders: List[str] = field(default_factory=list)
     cumulative_assignments: int = 0
     available_at: float = 0.0  # Simulation time when they become free
-    
-    __slots__ = ['agent_id', 'pos', 'rating', 'active_orders', 
-                 'cumulative_assignments', 'available_at']
