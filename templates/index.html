@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dispatch Simulator</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="page-shell">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Smart Delivery Dispatch</p>
+                <h1>Simulation Dashboard</h1>
+                <p class="subtitle">Run the dispatch algorithm and inspect assignment performance in one place.</p>
+            </div>
+            <button id="runButton" class="primary-btn">Run Simulation</button>
+        </header>
+
+        <main>
+            <section class="status-panel">
+                <div class="status-card" id="statusCard">
+                    <h2>Status</h2>
+                    <p id="statusText">Press the button to start the simulation.</p>
+                </div>
+                <div class="status-card">
+                    <h2>Summary</h2>
+                    <div class="metric-row"><span>Total Delivered</span><strong id="metricDelivered">-</strong></div>
+                    <div class="metric-row"><span>Avg Delivery Time</span><strong id="metricAvgTime">-</strong></div>
+                    <div class="metric-row"><span>Workload Variance</span><strong id="metricVariance">-</strong></div>
+                </div>
+            </section>
+
+            <section class="detail-grid">
+                <div class="panel">
+                    <h3>Agent Load</h3>
+                    <div id="agentList" class="list-panel"></div>
+                </div>
+                <div class="panel">
+                    <h3>Delivered Orders</h3>
+                    <div id="orderList" class="list-panel"></div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const runButton = document.getElementById('runButton');
+        const statusText = document.getElementById('statusText');
+        const metricDelivered = document.getElementById('metricDelivered');
+        const metricAvgTime = document.getElementById('metricAvgTime');
+        const metricVariance = document.getElementById('metricVariance');
+        const agentList = document.getElementById('agentList');
+        const orderList = document.getElementById('orderList');
+
+        runButton.addEventListener('click', async () => {
+            runButton.disabled = true;
+            runButton.innerText = 'Running...';
+            statusText.innerText = 'Simulation in progress. Please wait.';
+            agentList.innerHTML = '';
+            orderList.innerHTML = '';
+
+            try {
+                const response = await fetch('/simulate', { method: 'POST' });
+                const data = await response.json();
+                statusText.innerText = 'Simulation complete! Review the results below.';
+                metricDelivered.innerText = data.summary.total_delivered;
+                metricAvgTime.innerText = data.summary.avg_time.toFixed(2) + ' mins';
+                metricVariance.innerText = data.summary.variance.toFixed(2);
+
+                data.agents.forEach(agent => {
+                    const card = document.createElement('div');
+                    card.className = 'summary-card';
+                    card.innerHTML = `
+                        <strong>${agent.agent_id}</strong>
+                        <div>Rating: ${agent.rating}</div>
+                        <div>Assignments: ${agent.assignments}</div>
+                        <div>Position: (${agent.current_position[0]}, ${agent.current_position[1]})</div>
+                        <div>Active orders: ${agent.active_orders.length}</div>
+                    `;
+                    agentList.appendChild(card);
+                });
+
+                data.orders.slice(0, 15).forEach(order => {
+                    const card = document.createElement('div');
+                    card.className = 'summary-card';
+                    card.innerHTML = `
+                        <strong>${order.order_id}</strong>
+                        <div>Priority: ${order.priority}</div>
+                        <div>Assigned to: ${order.assigned_agent || 'Unassigned'}</div>
+                        <div>Delivered: ${order.delivery_time || 'N/A'}</div>
+                    `;
+                    orderList.appendChild(card);
+                });
+            } catch (error) {
+                statusText.innerText = 'Simulation failed. Please check server logs.';
+                console.error(error);
+            } finally {
+                runButton.disabled = false;
+                runButton.innerText = 'Run Simulation';
+            }
+        });
+    </script>
+</body>
+</html>

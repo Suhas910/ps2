@@ -11,6 +11,7 @@ class Order:
     priority: str
     sla_minutes: int
     status: str = "PENDING"  # PENDING, ASSIGNED, IN_TRANSIT, DELIVERED
+    assigned_agent: str = ""
     delivery_time: datetime = None
 
 @dataclass
