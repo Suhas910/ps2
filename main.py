@@ -1,9 +1,11 @@
 import time
+import heapq
 from data_loader import load_orders, load_agents, load_constraints
 from graph_engine import GraphEngine
 from dispatcher import Dispatcher
 from datetime import timedelta
-import json;
+import json
+
 
 def run_simulation():
     # 1. SETUP
@@ -50,51 +52,40 @@ def run_simulation():
             dispatcher.add_to_queue(new_order)
 
         # C. DISPATCH (Issue 11 - Handling Queueing)
-        # Batch assignment: try to assign all current pending orders once per tick,
-        # and requeue unassigned orders for later when agents free up.
         if dispatcher.pending_queue:
-            max_active = int(constraints['max_active_orders_per_agent'])
-            pending_requeue = []
-            assigned_any = False
+            p_val, ts, current_order = heapq.heappop(dispatcher.pending_queue)
+            best_agent = None
+            best_score = float('inf')
+            best_travel = 0
 
-            while dispatcher.pending_queue:
-                _, _, current_order = dispatcher.pop_next_order()
-                best_agent = None
-                best_score = float('inf')
-                best_travel_time = 0
+            for agent in agents:
+                if len(agent.active_orders) < int(constraints['max_active_orders_per_agent']):
+                    travel_time = graph.get_dist(agent.pos, current_order.location)
+                    
+                    # Issue 17: Handle Disconnected Graph
+                    if travel_time == float('inf'):
+                        continue
+                        
+                    score = dispatcher.score_agent(agent, current_order, travel_time)
+                    if score < best_score:
+                        best_score = score
+                        best_agent = agent
+                        best_travel = travel_time
 
-                for agent in agents:
-                    if len(agent.active_orders) < max_active:
-                        travel_time = graph.get_dist(agent.pos, current_order.location)
-                        score = dispatcher.score_agent(agent, current_order, travel_time)
+            if best_agent:
+                best_agent.active_orders.append(current_order.order_id)
+                best_agent.cumulative_assignments += 1
 
-                        if score < best_score:
-                            best_score = score
-                            best_agent = agent
-                            best_travel_time = travel_time
+                # Calculate completion time: Current + Prep + Travel
+                finish_time = current_time + timedelta(minutes=(current_order.prep_time + best_travel))
+                active_assignments.append((finish_time, best_agent, current_order))
 
-                if best_agent:
-                    assigned_any = True
-                    best_agent.active_orders.append(current_order.order_id)
-                    best_agent.cumulative_assignments += 1
-
-                    # Calculate completion time: Current + Prep + Travel
-                    finish_time = current_time + timedelta(minutes=(current_order.prep_time + best_travel_time))
-                    active_assignments.append((finish_time, best_agent, current_order))
-
-                    # Agent's new position will be the delivery location
-                    best_agent.pos = current_order.location
-                    current_order.status = "ASSIGNED"
-                else:
-                    pending_requeue.append((current_order.priority, current_order.timestamp, current_order))
-
-            for _, _, order_obj in pending_requeue:
-                dispatcher.add_to_queue(order_obj)
-
-            # Wait-and-see: if no assignment could be made this minute, let time advance
-            # so agents can finish current deliveries before reattempting.
-            if not assigned_any and active_assignments:
-                pass
+                # Agent's new position will be the delivery location
+                best_agent.pos = current_order.location
+                current_order.status = "ASSIGNED"
+            else:
+                # Re-queue if no agent is found
+                heapq.heappush(dispatcher.pending_queue, (p_val, ts, current_order))
 
         current_time += timedelta(minutes=1)
 
@@ -119,16 +110,19 @@ def run_simulation():
     print(f"Avg Delivery Time: {avg_time:.2f} mins")
     print(f"Workload Variance: {variance:.2f}")
 
-    # After the loop finishes
-    metrics = {
-        "total_orders": len(delivered_orders),
-        "avg_delivery_time_mins": sum((o.delivery_time - o.timestamp).total_seconds() / 60 for o in delivered_orders) / len(delivered_orders) if delivered_orders else 0,
-        "sla_compliance_rate": (len([o for o in delivered_orders if (o.delivery_time - o.timestamp).total_seconds() / 60 <= o.sla_minutes]) / len(delivered_orders)) * 100 if delivered_orders else 0,
-        "workload_variance": variance # Use the variance calculation from your current report
-    }
+    export_metrics(delivered_orders, agents, avg_time, variance)
 
+
+def export_metrics(delivered_orders, agents, avg_time, variance):
+    report = {
+        "overall": {
+            "avg_time": avg_time,
+            "variance": variance
+        },
+        "agent_load": {a.agent_id: a.cumulative_assignments for a in agents}
+    }
     with open('metrics.json', 'w') as f:
-        json.dump(metrics, f, indent=4)
+        json.dump(report, f, indent=4)
 
 
 if __name__ == "__main__":
